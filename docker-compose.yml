@@ -1,0 +1,14 @@
+services:
+  ntp-extender:
+    build: .
+    container_name: ntp-extender
+    restart: unless-stopped
+    ports:
+      - "12312:12312"
+      - "123:123/udp"
+    volumes:
+      - ./data:/data
+    environment:
+      - WEB_HOST=0.0.0.0
+      - WEB_PORT=12312
+      - NTP_PORT=123

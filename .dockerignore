@@ -1,0 +1,6 @@
+.git
+.cursor
+data
+app.log
+__pycache__
+*.pyc

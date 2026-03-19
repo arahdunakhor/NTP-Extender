@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NTP Extender</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: rgba(255, 255, 255, 0.06);
+      --card2: rgba(255, 255, 255, 0.09);
+      --text: rgba(255, 255, 255, 0.92);
+      --muted: rgba(255, 255, 255, 0.65);
+      --good: #22c55e;
+      --bad: #ef4444;
+      --accent: #60a5fa;
+    }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      background: radial-gradient(1200px 600px at 20% 10%, rgba(96,165,250,0.25), transparent),
+                  radial-gradient(1200px 600px at 70% 30%, rgba(34,197,94,0.18), transparent),
+                  var(--bg);
+      color: var(--text);
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+    h1 { font-size: 20px; margin: 0; }
+    .sub { color: var(--muted); font-size: 13px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+    .left-column { display: flex; flex-direction: column; gap: 14px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .card h2 { margin: 0 0 10px 0; font-size: 14px; color: rgba(255,255,255,0.86); font-weight: 650; }
+    .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin: 8px 0; }
+    .label { color: var(--muted); font-size: 13px; }
+    .value { font-size: 13px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--card2);
+      border: 1px solid rgba(255,255,255,0.12);
+      font-size: 13px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+    .dot.good { background: var(--good); }
+    .dot.bad { background: var(--bad); }
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.18);
+      color: var(--text);
+      outline: none;
+      font-size: 13px;
+    }
+    select { min-height: 150px; }
+    .server-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+    .server-row { display: flex; gap: 8px; align-items: center; }
+    .server-row input { flex: 1; }
+    .icon-btn {
+      width: 34px;
+      min-width: 34px;
+      height: 34px;
+      padding: 0;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      line-height: 1;
+    }
+    .tz-wrap { position: relative; }
+    .tz-dropdown {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px;
+      background: rgba(8, 15, 28, 0.98);
+      z-index: 30;
+      display: none;
+    }
+    .tz-dropdown.show { display: block; }
+    .tz-item {
+      padding: 9px 10px;
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .tz-item:last-child { border-bottom: 0; }
+    .tz-item:hover { background: rgba(255,255,255,0.08); }
+    .tz-empty {
+      padding: 9px 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    button {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button.primary { background: rgba(96,165,250,0.25); border-color: rgba(96,165,250,0.35); }
+    button.danger { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.35); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 13px; }
+    th { color: rgba(255,255,255,0.78); font-weight: 650; }
+    td code { color: rgba(255,255,255,0.86); }
+    .logs { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; white-space: pre-wrap; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.10); border-radius: 12px; padding: 10px; max-height: 320px; overflow: auto; }
+    .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .statusLine { margin-top: 6px; color: var(--muted); font-size: 13px; }
+    .live-time-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0 12px 0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(96,165,250,0.35);
+      background: rgba(96,165,250,0.12);
+    }
+    .live-time-label { color: rgba(255,255,255,0.82); font-size: 13px; }
+    .live-time-value {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+      color: #dbeafe;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>NTP Extender</h1>
+        <div class="sub">Веб-настройка синхронизации и локальная раздача NTP во внутренней сети</div>
+      </div>
+      <div class="pill" id="syncPill">
+        <span class="dot"></span>
+        <span id="syncPillText">Загрузка...</span>
+      </div>
+      <button id="logoutBtn" type="button">Выйти</button>
+    </div>
+
+    <div class="grid">
+      <div class="left-column">
+        <div class="card">
+          <h2>Состояние</h2>
+          <div class="live-time-row">
+            <div class="live-time-label">Текущее время</div>
+            <div class="live-time-value" id="liveClockValue">-</div>
+          </div>
+          <div class="row"><div class="label">Часовой пояс</div><div class="value" id="tzValue">-</div></div>
+          <div class="row"><div class="label">Смещение (offset)</div><div class="value" id="offsetValue">-</div></div>
+          <div class="row"><div class="label">Дисперсия</div><div class="value" id="dispValue">-</div></div>
+          <div class="row"><div class="label">Stratum</div><div class="value" id="stratumValue">-</div></div>
+          <div class="row"><div class="label">Последняя синхронизация</div><div class="value" id="lastSyncValue">-</div></div>
+          <div class="row"><div class="label">Аптайм</div><div class="value" id="uptimeValue">-</div></div>
+          <div class="row"><div class="label">Синхронизаций OK</div><div class="value" id="syncOkValue">-</div></div>
+          <div class="row"><div class="label">Синхронизаций FAIL</div><div class="value" id="syncFailValue">-</div></div>
+
+          <div class="btns">
+            <button class="primary" id="syncNowBtn">Синхронизировать сейчас</button>
+            <button id="refreshBtn">Обновить</button>
+          </div>
+          <div class="statusLine" id="statusMsg"></div>
+        </div>
+
+        <div class="card">
+          <h2>Список источников и логи</h2>
+          <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+            <div style="flex: 1; min-width: 320px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Сервер</th>
+                    <th>Ок</th>
+                    <th>Offset</th>
+                    <th>Delay</th>
+                    <th>Ошибка</th>
+                  </tr>
+                </thead>
+                <tbody id="serversTableBody"></tbody>
+              </table>
+            </div>
+            <div style="flex: 1; min-width: 320px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                <div class="label">Логи (последние)</div>
+                <button id="refreshLogsBtn" type="button" style="width:auto; padding:6px 10px;">Обновить</button>
+              </div>
+              <div class="logs" id="logsBox"></div>
+              <div class="hint">Обновляется каждые 10 секунд. Хранение логов: до 7 дней и максимум 50 MB.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card settings-card" style="grid-row: span 2;">
+        <h2>Настройки</h2>
+
+        <div class="row" style="align-items:flex-start; gap: 12px;">
+          <div style="flex: 1;">
+            <div class="label" style="margin-bottom: 6px;">Внешние NTP-серверы</div>
+            <div id="serversList" class="server-list"></div>
+            <div class="btns" style="margin-top:8px;">
+              <button class="icon-btn" id="addServerBtn" title="Добавить сервер" type="button">+</button>
+            </div>
+            <div class="hint">Максимум 10 серверов. Пример: <code>time.google.com</code>, <code>pool.ntp.org</code>.</div>
+          </div>
+        </div>
+
+        <div class="row"><div class="label">Часовой пояс (IANA)</div></div>
+        <div class="tz-wrap">
+          <input type="text" id="timezoneInput" placeholder="Начните вводить, например: Europe/Moscow" autocomplete="off" />
+          <div id="timezoneDropdown" class="tz-dropdown"></div>
+        </div>
+
+        <div class="row"><div class="label">Интервал синхронизации (сек)</div></div>
+        <input type="number" id="syncIntervalInput" min="10" step="1" />
+
+        <div class="row"><div class="label">Таймаут NTP запроса (сек)</div></div>
+        <input type="number" id="syncTimeoutInput" min="1" step="0.5" />
+
+        <div class="row"><div class="label">Макс. дисперсия для “здоровых часов” (сек)</div></div>
+        <input type="number" id="maxDispInput" min="0.1" step="0.1" />
+
+        <div class="row"><div class="label">Порт локального NTP-сервера</div></div>
+        <input type="number" id="ntpPortInput" min="1" max="65535" step="1" />
+        <div class="hint">
+          Для настройки клиента используйте: <code id="ntpEndpointValue">-</code>
+        </div>
+        <div class="hint">
+          Важно: при запуске в Docker bridge изменение порта в UI заработает только если этот UDP порт также проброшен на хост.
+        </div>
+
+        <div class="btns">
+          <button id="testBtn">Проверить соединение</button>
+          <button class="primary" id="saveBtn">Сохранить и применить</button>
+        </div>
+
+        <hr style="border-color: rgba(255,255,255,0.1); margin: 14px 0;">
+        <div class="row"><div class="label">Смена пароля администратора</div></div>
+        <input type="password" id="currentPasswordInput" placeholder="Текущий пароль" />
+        <div style="height:8px;"></div>
+        <input type="password" id="newPasswordInput" placeholder="Новый пароль" />
+        <div class="btns">
+          <button id="changePasswordBtn" type="button">Сменить пароль</button>
+        </div>
+
+        <div class="hint" style="margin-top:10px;">Результаты проверки появятся ниже.</div>
+        <div id="testResults"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+
+    function formatUnix(ts) {
+      if (!ts) return "-";
+      try {
+        const d = new Date(ts * 1000);
+        return d.toLocaleString();
+      } catch (e) { return String(ts); }
+    }
+
+    function formatLiveClock(dateObj, timezone) {
+      try {
+        const formatter = new Intl.DateTimeFormat("ru-RU", {
+          timeZone: timezone || "UTC",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        });
+        return formatter.format(dateObj);
+      } catch (e) {
+        return dateObj.toLocaleString();
+      }
+    }
+
+    function updateLiveClock() {
+      const correctedMs = Date.now() + (Number(currentOffsetSec || 0) * 1000);
+      const correctedDate = new Date(correctedMs);
+      el("liveClockValue").textContent = formatLiveClock(correctedDate, currentTimezone);
+    }
+
+    function setSyncPill(synced) {
+      const dot = document.querySelector("#syncPill .dot");
+      if (synced) {
+        dot.classList.add("good");
+        dot.classList.remove("bad");
+        el("syncPillText").textContent = "Синхронизировано";
+      } else {
+        dot.classList.add("bad");
+        dot.classList.remove("good");
+        el("syncPillText").textContent = "Не синхронизировано";
+      }
+    }
+
+    const MAX_SERVERS = 10;
+    let timezoneOptionsAll = [];
+    let currentServerIp = "";
+    let currentOffsetSec = 0;
+    let currentTimezone = "UTC";
+
+    function getTimezoneList() {
+      try {
+        if (typeof Intl.supportedValuesOf === "function") {
+          const list = Intl.supportedValuesOf("timeZone");
+          if (Array.isArray(list) && list.length) return list;
+        }
+      } catch (e) {}
+      return [
+        "Europe/Moscow", "UTC", "Europe/Berlin", "Europe/London", "Asia/Tokyo",
+        "Asia/Dubai", "Asia/Almaty", "America/New_York", "America/Chicago",
+        "America/Denver", "America/Los_Angeles", "Australia/Sydney"
+      ];
+    }
+
+    function applyTimezoneFilter() {
+      const query = (el("timezoneInput").value || "").trim().toLowerCase();
+      const filtered = timezoneOptionsAll.filter(tz => tz.toLowerCase().includes(query)).slice(0, 300);
+      const dd = el("timezoneDropdown");
+      dd.innerHTML = "";
+
+      if (!filtered.length) {
+        const empty = document.createElement("div");
+        empty.className = "tz-empty";
+        empty.textContent = "Совпадений не найдено";
+        dd.appendChild(empty);
+      } else {
+        for (const tz of filtered) {
+          const item = document.createElement("div");
+          item.className = "tz-item";
+          item.textContent = tz;
+          item.addEventListener("mousedown", (ev) => {
+            ev.preventDefault();
+            el("timezoneInput").value = tz;
+            hideTimezoneDropdown();
+          });
+          dd.appendChild(item);
+        }
+      }
+      showTimezoneDropdown();
+    }
+
+    function setTimezoneValue(timezone) {
+      if (!timezone) return;
+      el("timezoneInput").value = timezone;
+      applyTimezoneFilter();
+      hideTimezoneDropdown();
+    }
+
+    function showTimezoneDropdown() {
+      el("timezoneDropdown").classList.add("show");
+    }
+
+    function hideTimezoneDropdown() {
+      el("timezoneDropdown").classList.remove("show");
+    }
+
+    function addServerRow(value = "") {
+      const list = el("serversList");
+      const count = list.querySelectorAll(".server-row").length;
+      if (count >= MAX_SERVERS) {
+        setStatusMsg(`Можно добавить не более ${MAX_SERVERS} серверов.`);
+        return;
+      }
+
+      const row = document.createElement("div");
+      row.className = "server-row";
+      row.innerHTML = `
+        <input type="text" class="server-input" placeholder="DNS или IP NTP-сервера" value="${String(value).replace(/"/g, "&quot;")}" />
+        <button class="icon-btn danger remove-server-btn" type="button" title="Удалить">−</button>
+      `;
+      row.querySelector(".remove-server-btn").addEventListener("click", () => {
+        row.remove();
+        if (!el("serversList").querySelector(".server-row")) addServerRow("");
+      });
+      list.appendChild(row);
+    }
+
+    function setServerList(servers) {
+      const list = el("serversList");
+      list.innerHTML = "";
+      const clean = Array.isArray(servers) ? servers.slice(0, MAX_SERVERS) : [];
+      if (!clean.length) {
+        addServerRow("");
+        return;
+      }
+      for (const s of clean) addServerRow(String(s || ""));
+    }
+
+    function getServersFromRows() {
+      return [...document.querySelectorAll(".server-input")]
+        .map(i => (i.value || "").trim())
+        .filter(Boolean)
+        .slice(0, MAX_SERVERS);
+    }
+
+    function buildConfigFromStatus(status) {
+      const servers = (status.config && status.config.external_servers) ? status.config.external_servers : [];
+      if (!el("serversList").querySelector(".server-row")) setServerList(servers);
+      if (!el("timezoneInput").value) setTimezoneValue(status.config.timezone || "");
+      if (!el("syncIntervalInput").value) el("syncIntervalInput").value = status.config.sync_interval_sec || 300;
+      if (!el("syncTimeoutInput").value) el("syncTimeoutInput").value = status.config.sync_timeout_sec || 4;
+      if (!el("maxDispInput").value) el("maxDispInput").value = status.config.max_dispersion_sec || 5;
+      if (!el("ntpPortInput").value) el("ntpPortInput").value = status.config.ntp_port || 123;
+      updateNtpEndpointPreview();
+    }
+
+    function updateNtpEndpointPreview(status = null) {
+      const port = Number(el("ntpPortInput").value || 123);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        el("ntpEndpointValue").textContent = "Укажите корректный порт (1..65535)";
+        return;
+      }
+      if (status && status.ntp_endpoint) {
+        const parts = String(status.ntp_endpoint).split(":");
+        const ipPart = parts.slice(0, -1).join(":");
+        currentServerIp = ipPart;
+        el("ntpEndpointValue").textContent = `${ipPart}:${port}`;
+        return;
+      }
+      if (currentServerIp) {
+        el("ntpEndpointValue").textContent = `${currentServerIp}:${port}`;
+      } else {
+        el("ntpEndpointValue").textContent = "Определяем IP сервера...";
+      }
+    }
+
+    function updateServersTable(status) {
+      const rows = status.servers || [];
+      const body = el("serversTableBody");
+      body.innerHTML = "";
+      for (const s of rows) {
+        const tr = document.createElement("tr");
+        const okText = s.ok ? "Да" : "Нет";
+        const err = s.error ? String(s.error) : "-";
+
+        const tdHost = document.createElement("td");
+        const code = document.createElement("code");
+        code.textContent = String(s.host);
+        tdHost.appendChild(code);
+
+        const tdOk = document.createElement("td");
+        tdOk.textContent = okText;
+
+        const tdOffset = document.createElement("td");
+        tdOffset.textContent = s.offset_sec !== null && s.offset_sec !== undefined
+          ? Number(s.offset_sec).toFixed(6) + " s"
+          : "-";
+
+        const tdDelay = document.createElement("td");
+        tdDelay.textContent = s.delay_sec !== null && s.delay_sec !== undefined
+          ? Number(s.delay_sec).toFixed(4) + " s"
+          : "-";
+
+        const tdErr = document.createElement("td");
+        tdErr.textContent = err;
+
+        tr.appendChild(tdHost);
+        tr.appendChild(tdOk);
+        tr.appendChild(tdOffset);
+        tr.appendChild(tdDelay);
+        tr.appendChild(tdErr);
+        body.appendChild(tr);
+      }
+    }
+
+    async function refreshStatus() {
+      const r = await fetch("/api/status");
+      if (r.status === 401) {
+        window.location.href = "/login";
+        return {};
+      }
+      const status = await r.json();
+      el("tzValue").textContent = status.timezone || "-";
+      el("offsetValue").textContent = status.offset_sec !== null && status.offset_sec !== undefined
+        ? Number(status.offset_sec).toFixed(6) + " s" : "-";
+      el("dispValue").textContent = status.dispersion_sec !== null && status.dispersion_sec !== undefined
+        ? Number(status.dispersion_sec).toFixed(6) + " s" : "-";
+      el("stratumValue").textContent = status.stratum !== null && status.stratum !== undefined ? String(status.stratum) : "-";
+      el("lastSyncValue").textContent = formatUnix(status.last_sync_at);
+      el("uptimeValue").textContent = status.uptime_sec !== null && status.uptime_sec !== undefined
+        ? Math.round(Number(status.uptime_sec)) + " сек" : "-";
+      el("syncOkValue").textContent = status.sync_attempt_ok_count !== null && status.sync_attempt_ok_count !== undefined
+        ? String(status.sync_attempt_ok_count) : "-";
+      el("syncFailValue").textContent = status.sync_attempt_fail_count !== null && status.sync_attempt_fail_count !== undefined
+        ? String(status.sync_attempt_fail_count) : "-";
+      currentOffsetSec = Number(status.offset_sec || 0);
+      currentTimezone = status.timezone || "UTC";
+      updateLiveClock();
+
+      setSyncPill(status.synced);
+      updateServersTable(status);
+      updateNtpEndpointPreview(status);
+
+      buildConfigFromStatus(status);
+      return status;
+    }
+
+    async function refreshLogs() {
+      const r = await fetch("/api/logs?limit=200");
+      if (r.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const data = await r.json();
+      el("logsBox").textContent = (data.logs || []).join("\\n");
+    }
+
+    function setStatusMsg(text) { el("statusMsg").textContent = text || ""; }
+
+    function getSyncResultMessage(syncOk, synced, reason) {
+      if (!syncOk) return "Не удалось синхронизироваться: " + (reason || "неизвестно");
+      return synced ? "Время синхронизировано успешно" : "Синхронизация выполнена, но состояние нестабильно";
+    }
+
+    async function testServers() {
+      const servers = getServersFromRows();
+      if (!servers.length) {
+        setStatusMsg("Добавьте хотя бы один сервер для теста.");
+        return;
+      }
+      if (servers.length > MAX_SERVERS) {
+        setStatusMsg(`Допустимо не более ${MAX_SERVERS} серверов.`);
+        return;
+      }
+      const timeoutSec = Number(el("syncTimeoutInput").value || 4);
+      el("testResults").innerHTML = "Идёт проверка...";
+      const r = await fetch("/api/test", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ servers, timeout_sec: timeoutSec })
+      });
+      if (r.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const data = await r.json();
+      if (!data.ok) {
+        el("testResults").innerHTML = "Ошибка теста: " + (data.detail || "неизвестно");
+        return;
+      }
+      let html = `<table><thead><tr><th>Сервер</th><th>Ок</th><th>Offset</th><th>Delay</th><th>Ошибка</th></tr></thead><tbody>`;
+      for (const item of data.results || []) {
+        const host = String(item.host || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+        const ok = item.ok ? "Да" : "Нет";
+        const offset = item.offset_sec !== null && item.offset_sec !== undefined ? Number(item.offset_sec).toFixed(6) + " s" : "-";
+        const delay = item.delay_sec !== null && item.delay_sec !== undefined ? Number(item.delay_sec).toFixed(4) + " s" : "-";
+        const error = String(item.error || "-").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+        html += `<tr><td><code>${host}</code></td><td>${ok}</td><td>${offset}</td><td>${delay}</td><td>${error}</td></tr>`;
+      }
+      html += `</tbody></table>`;
+      el("testResults").innerHTML = html;
+      setStatusMsg("Проверка завершена.");
+    }
+
+    async function saveConfigAndApply() {
+      const timezone = (el("timezoneInput").value || "").trim();
+      const servers = getServersFromRows();
+      const syncIntervalSec = Number(el("syncIntervalInput").value || 300);
+      const syncTimeoutSec = Number(el("syncTimeoutInput").value || 4);
+      const maxDispSec = Number(el("maxDispInput").value || 5);
+      const ntpPort = Number(el("ntpPortInput").value || 123);
+
+      if (!timezone) {
+        setStatusMsg("Укажите часовой пояс (IANA).");
+        return;
+      }
+      if (!servers.length) {
+        setStatusMsg("Список внешних серверов пуст.");
+        return;
+      }
+      if (servers.length > MAX_SERVERS) {
+        setStatusMsg(`Допустимо не более ${MAX_SERVERS} серверов.`);
+        return;
+      }
+      if (!Number.isInteger(ntpPort) || ntpPort < 1 || ntpPort > 65535) {
+        setStatusMsg("NTP порт должен быть в диапазоне 1..65535.");
+        return;
+      }
+
+      setStatusMsg("Сохраняем конфиг...");
+      const r = await fetch("/api/save_config", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          timezone,
+          external_servers: servers,
+          sync_interval_sec: syncIntervalSec,
+          sync_timeout_sec: syncTimeoutSec,
+          max_dispersion_sec: maxDispSec,
+          ntp_port: ntpPort
+        })
+      });
+      if (r.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const data = await r.json();
+      if (!data.ok) {
+        setStatusMsg("Сохранение не удалось: " + (data.detail || "неизвестно"));
+        return;
+      }
+      setStatusMsg("Конфиг сохранён. Запускаю синхронизацию...");
+      const r2 = await fetch("/api/sync", { method: "POST" });
+      if (r2.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const data2 = await r2.json();
+      setStatusMsg(getSyncResultMessage(Boolean(data2.ok), Boolean(data2.synced), data2.reason));
+      await refreshStatus();
+    }
+
+    async function syncNow() {
+      setStatusMsg("Синхронизируем...");
+      const r = await fetch("/api/sync", { method: "POST" });
+      if (r.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const data = await r.json();
+      setStatusMsg(getSyncResultMessage(Boolean(data.ok), Boolean(data.synced), data.reason));
+      await refreshStatus();
+      await refreshLogs();
+    }
+
+    async function changePassword() {
+      const currentPassword = el("currentPasswordInput").value || "";
+      const newPassword = el("newPasswordInput").value || "";
+      if (!currentPassword) {
+        setStatusMsg("Введите текущий пароль.");
+        return;
+      }
+      setStatusMsg("Меняем пароль...");
+      const r = await fetch("/api/change_password", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword
+        })
+      });
+      if (r.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const data = await r.json();
+      if (!data.ok) {
+        setStatusMsg("Не удалось сменить пароль: " + (data.detail || "неизвестно"));
+        return;
+      }
+      el("currentPasswordInput").value = "";
+      el("newPasswordInput").value = "";
+      setStatusMsg("Пароль успешно изменён.");
+    }
+
+    async function logout() {
+      await fetch("/api/logout", { method: "POST" });
+      window.location.href = "/login";
+    }
+
+    // Подвязка событий
+    timezoneOptionsAll = getTimezoneList();
+    const tzInput = el("timezoneInput");
+    tzInput.addEventListener("focus", applyTimezoneFilter);
+    tzInput.addEventListener("input", applyTimezoneFilter);
+    tzInput.addEventListener("blur", () => {
+      // Небольшая задержка, чтобы успел сработать click по элементу списка.
+      setTimeout(hideTimezoneDropdown, 120);
+    });
+    document.addEventListener("click", (ev) => {
+      const wrap = document.querySelector(".tz-wrap");
+      if (wrap && !wrap.contains(ev.target)) hideTimezoneDropdown();
+    });
+    el("addServerBtn").addEventListener("click", () => addServerRow(""));
+    el("ntpPortInput").addEventListener("input", updateNtpEndpointPreview);
+
+    el("syncNowBtn").addEventListener("click", syncNow);
+    el("refreshBtn").addEventListener("click", async () => { await refreshStatus(); await refreshLogs(); });
+    el("refreshLogsBtn").addEventListener("click", refreshLogs);
+    el("testBtn").addEventListener("click", testServers);
+    el("saveBtn").addEventListener("click", saveConfigAndApply);
+    el("changePasswordBtn").addEventListener("click", changePassword);
+    el("logoutBtn").addEventListener("click", logout);
+
+    // Старт
+    refreshStatus().then(refreshLogs).catch(err => { el("logsBox").textContent = "Ошибка: " + String(err); });
+    setInterval(() => refreshStatus().catch(()=>{}), 5000);
+    setInterval(() => refreshLogs().catch(()=>{}), 10000);
+    setInterval(() => updateLiveClock(), 1000);
+  </script>
+</body>
+</html>
+
