@@ -61,15 +61,12 @@ docker compose ps
 
 ## Готовый docker-compose.yml
 
-Сервис уже настроен на:
-- веб-интерфейс: `12312/tcp`;
-- NTP для клиентов: `123/udp`;
-- volume для данных: `./data:/data`.
+Скопируйте этот `docker-compose.yml` и запустите приложение из Docker Hub.
 
 ```yaml
 services:
   ntp-extender:
-    build: .
+    image: arahdunakhor/ntp-extender:latest
     container_name: ntp-extender
     restart: unless-stopped
     ports:
@@ -81,6 +78,17 @@ services:
       - WEB_HOST=0.0.0.0
       - WEB_PORT=12312
       - NTP_PORT=123
+```
+
+Как запустить:
+
+1. Создайте папку, например `ntp-extender`.
+2. Вставьте в файл `docker-compose.yml` конфигурацию выше.
+3. Выполните:
+
+```bash
+docker compose pull
+docker compose up -d
 ```
 
 ## Обновление приложения
